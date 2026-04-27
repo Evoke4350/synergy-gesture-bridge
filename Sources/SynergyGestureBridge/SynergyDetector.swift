@@ -7,10 +7,20 @@ enum SynergyDetector {
         "synergy-core",
         "synergy-service",
         "synergys",
-        "synergyc"
+        "synergyc",
+        "deskflow",
+        "input leap",
+        "inputleap",
+        "barrier"
     ]
 
-    private static let bundleIdHints = ["symless", "synergy"]
+    private static let bundleIdHints = [
+        "symless",
+        "synergy",
+        "deskflow",
+        "inputleap",
+        "barrier"
+    ]
 
     static func isRunning() -> Bool {
         for app in NSWorkspace.shared.runningApplications {

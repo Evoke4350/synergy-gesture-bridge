@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 /// Glues policy (when to act) and action (what to send) together.
 ///
@@ -10,6 +11,15 @@ struct BridgeCoordinator {
     let isSynergyRunning: () -> Bool
     let isCursorOnClient: () -> Bool
     let emitKey: (CGKeyCode) -> Void
+
+    /// When true, the Dock swipe **began** event should be consumed so macOS does not start
+    /// a local 3-finger animation we will replace with ctrl+arrow (avoids stray cursor motion).
+    static func shouldConsumeDockSwipeBegan() -> Bool {
+        guard SynergyDetector.isRunning() else { return false }
+        if CursorLocator.forceClientCursor { return true }
+        return ProcessInfo.processInfo.environment["SGB_CONSUME_DOCK_BEGAN"] == "1"
+            && CursorLocator.isOnClientScreen()
+    }
 
     init(
         translator: GestureTranslator = GestureTranslator(),
@@ -29,7 +39,6 @@ struct BridgeCoordinator {
             return .passthrough
         }
         guard isCursorOnClient() else {
-            Logger.debug("cursor on server — passthrough")
             return .passthrough
         }
         guard let key = translator.arrowKey(forDeltaX: deltaX, deltaY: deltaY) else {

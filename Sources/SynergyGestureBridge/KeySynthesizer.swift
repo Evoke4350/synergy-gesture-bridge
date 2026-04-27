@@ -73,8 +73,46 @@ enum KeySynthesizer {
         event.post(tap: tap)
     }
 
+    private static func truthyEnv(_ name: String) -> Bool {
+        truthy(ProcessInfo.processInfo.environment[name])
+    }
+
+    /// Shells out to `osascript` to dispatch the keystroke via `System Events`. macOS
+    /// routes those through the Accessibility / Apple-Events path, which fires system
+    /// shortcuts (Mission Control, Spaces) on recent macOS versions where bare
+    /// `CGEventPost` synth no longer triggers them. Requires Automation permission for
+    /// this binary the first time it's used (macOS will prompt).
+    private static func postViaAppleScript(_ key: CGKeyCode) {
+        let script = "tell application \"System Events\" to key code \(key) using control down"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        let stderrPipe = Pipe()
+        process.standardError = stderrPipe
+        process.standardOutput = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                Logger.debug("posted ctrl+arrow via osascript keyCode=\(key)")
+            } else {
+                let data = stderrPipe.fileHandleForReading.availableData
+                let msg = String(data: data, encoding: .utf8) ?? ""
+                Logger.debug("osascript exit=\(process.terminationStatus) keyCode=\(key) stderr=\(msg.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
+        } catch {
+            Logger.debug("osascript launch failed: \(error)")
+        }
+    }
+
     private static func postControlArrowNow(_ key: CGKeyCode) {
         let env = ProcessInfo.processInfo.environment
+
+        if truthyEnv("SGB_USE_APPLESCRIPT") {
+            postViaAppleScript(key)
+            return
+        }
+
         let tapLoc = env["SGB_TAP_LOCATION"]?.lowercased() ?? ""
 
         let useHID: Bool
